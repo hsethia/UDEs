@@ -1,0 +1,99 @@
+# %% [markdown]
+# # ODE Simulation Demo
+#
+# In this example, we'll use scipy.integrate to solve ordinary differential equations (ODEs).
+# This is equivalent to the OrdinaryDiffEq.jl package in Julia.
+
+# %%
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp
+
+# %% [markdown]
+# We'll create a system of differential equations. In Julia, ModelingToolkit provides
+# a nice interface for defining equations. In Python, we define the ODE system as a function.
+#
+# Our model is:
+# dX/dt = v * Y^n / (K^n + Y^n) - d*X
+# dY/dt = X - d*Y
+
+# %%
+def xy_model(t, state, v, K, n, d):
+    """
+    ODE system for X and Y dynamics.
+    
+    Parameters:
+    - t: time
+    - state: [X, Y]
+    - v, K, n, d: model parameters
+    """
+    X, Y = state
+    dX_dt = v * (Y**n) / (K**n + Y**n) - d*X
+    dY_dt = X - d*Y
+    return [dX_dt, dY_dt]
+
+# %% [markdown]
+# Next, we declare the initial conditions and parameter values.
+
+# %%
+# Initial conditions
+X0 = 2.0
+Y0 = 0.1
+u0 = [X0, Y0]
+
+# Parameter values
+v = 1.1
+K = 2.0
+n = 3.0
+d = 0.5
+ps_true = (v, K, n, d)
+
+# Time span
+t_start = 0.0
+t_end = 45.0
+
+# %% [markdown]
+# We can now simulate our model using solve_ivp.
+
+# %%
+# Solve the ODE
+sol = solve_ivp(
+    lambda t, y: xy_model(t, y, *ps_true),
+    [t_start, t_end],
+    u0,
+    dense_output=True,
+    method='RK45'
+)
+
+# %% [markdown]
+# We can plot the simulation results.
+
+# %%
+# Create a dense time grid for plotting
+t_plot = np.linspace(t_start, t_end, 1000)
+y_plot = sol.sol(t_plot)
+
+plt.figure(figsize=(10, 6))
+plt.plot(t_plot, y_plot[0], label='X(t)', linewidth=2)
+plt.plot(t_plot, y_plot[1], label='Y(t)', linewidth=2)
+plt.xlabel('Time')
+plt.ylabel('Concentration')
+plt.title('ODE Simulation: X-Y Dynamics')
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.show()
+
+# %% [markdown]
+# Finally, to evaluate the solution at a specific time point, we can use the solution object.
+
+# %%
+# Evaluate X at t=10.0
+t_eval = 10.0
+X_at_10 = sol.sol(t_eval)[0]
+Y_at_10 = sol.sol(t_eval)[1]
+
+print(f"X(10.0) = {X_at_10:.4f}")
+print(f"Y(10.0) = {Y_at_10:.4f}")
+
+
+# %%

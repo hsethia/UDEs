@@ -1,0 +1,71 @@
+# %% [markdown]
+# # Neural Network Evaluation Demo
+#
+# We will use PyTorch to create the neural network architecture.
+# This is equivalent to the Lux.jl package used in Julia.
+
+# %%
+import torch
+import torch.nn as nn
+import numpy as np
+
+# %% [markdown]
+# The neural network is declared using nn.Sequential. After this, we list each layer,
+# with the layer's size, activation function, and other properties.
+# Here we use the softplus activation function. Note that softplus(x) > 0, and by using 
+# this function in the last layer, the overall output will also follow this constraint 
+# (which can be useful or problematic).
+
+# %%
+class NeuralNetwork(nn.Module):
+    def __init__(self):
+        super(NeuralNetwork, self).__init__()
+        self.network = nn.Sequential(
+            nn.Linear(1, 3, bias=False),
+            nn.Softplus(),
+            nn.Linear(3, 3, bias=False),
+            nn.Softplus(),
+            nn.Linear(3, 1, bias=False),
+            nn.Softplus()
+        )
+    
+    def forward(self, x):
+        return self.network(x)
+
+# Create the neural network
+nn_arch = NeuralNetwork()
+
+# %% [markdown]
+# A neural network takes a parameterisation, from which it behaves like a normal function and
+# can process inputs. We can set a random seed for reproducibility.
+
+# %%
+# Set random seed for reproducibility
+torch.manual_seed(1234)
+
+# Reinitialize the network with the seed
+nn_arch = NeuralNetwork()
+
+# %% [markdown]
+# We can now apply the neural network function by calling it with an input.
+# Note: PyTorch works with tensors. The input must be in tensor form (even in our case
+# it is a single-input neural network).
+
+# %%
+input_value = torch.tensor([[1.0]])
+output = nn_arch(input_value)
+print(f"Input: {input_value.item()}")
+print(f"Output: {output.item()}")
+
+# %% [markdown]
+# We can also evaluate the network for multiple inputs at once.
+
+# %%
+inputs = torch.tensor([[0.5], [1.0], [1.5], [2.0]])
+outputs = nn_arch(inputs)
+print("Inputs and outputs:")
+for i, o in zip(inputs, outputs):
+    print(f"  Input: {i.item():.2f}, Output: {o.item():.4f}")
+
+
+# %%

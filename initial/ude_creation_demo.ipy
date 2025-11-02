@@ -1,0 +1,170 @@
+# %% [markdown]
+# # Universal Differential Equations (UDE) Creation Demo
+#
+# Here, we will demonstrate how to integrate neural networks with ODEs to create 
+# hybrid ODE/Neural Network models (Universal Differential Equations).
+#
+# This is equivalent to ModelingToolkitNeuralNets.jl in Julia.
+
+# %%
+import numpy as np
+import matplotlib.pyplot as plt
+import torch
+import torch.nn as nn
+from scipy.integrate import solve_ivp
+
+# %% [markdown]
+# First, we create a neural network architecture using PyTorch.
+
+# %%
+class NeuralNetwork(nn.Module):
+    def __init__(self):
+        super(NeuralNetwork, self).__init__()
+        self.network = nn.Sequential(
+            nn.Linear(1, 3, bias=False),
+            nn.Softplus(),
+            nn.Linear(3, 3, bias=False),
+            nn.Softplus(),
+            nn.Linear(3, 1, bias=False),
+            nn.Softplus()
+        )
+    
+    def forward(self, x):
+        return self.network(x)
+
+# Initialize the neural network
+torch.manual_seed(1234)
+nn_model = NeuralNetwork()
+
+# %% [markdown]
+# Now we define our hybrid ODE system. The key difference from the previous ODE example
+# is that one of the terms is now a neural network function instead of a parameterized equation.
+#
+# Our UDE model is:
+# dX/dt = NN(Y) - d*X  (Note: NN replaces the Hill function)
+# dY/dt = X - d*Y
+
+# %%
+def xy_model_ude(t, state, nn_model, d):
+    """
+    UDE system with neural network component.
+    
+    Parameters:
+    - t: time
+    - state: [X, Y]
+    - nn_model: neural network function
+    - d: decay parameter
+    """
+    X, Y = state
+    
+    # Convert Y to tensor, evaluate NN, and convert back to float
+    with torch.no_grad():
+        Y_tensor = torch.tensor([[Y]], dtype=torch.float32)
+        nn_output = nn_model(Y_tensor).item()
+    
+    dX_dt = nn_output - d*X
+    dY_dt = X - d*Y
+    return [dX_dt, dY_dt]
+
+# %% [markdown]
+# We can simulate the model by providing initial conditions and parameter values.
+
+# %%
+# Initial conditions
+X0 = 2.0
+Y0 = 0.1
+u0 = [X0, Y0]
+
+# Parameter value (only d, since the neural network handles the other dynamics)
+d = 0.5
+
+# Time span
+t_start = 0.0
+t_end = 45.0
+
+# Solve the UDE
+sol_ude = solve_ivp(
+    lambda t, y: xy_model_ude(t, y, nn_model, d),
+    [t_start, t_end],
+    u0,
+    dense_output=True,
+    method='RK45'
+)
+
+# %% [markdown]
+# Plot the simulation results.
+
+# %%
+# Create a dense time grid for plotting
+t_plot = np.linspace(t_start, t_end, 1000)
+y_plot = sol_ude.sol(t_plot)
+
+plt.figure(figsize=(10, 6))
+plt.plot(t_plot, y_plot[0], label='X(t)', linewidth=2)
+plt.plot(t_plot, y_plot[1], label='Y(t)', linewidth=2)
+plt.xlabel('Time')
+plt.ylabel('Concentration')
+plt.title('UDE Simulation: X-Y Dynamics with Neural Network')
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.show()
+
+# %% [markdown]
+# We can visualize what functional form the neural network has adopted.
+
+# %%
+# Evaluate the neural network over a grid
+y_grid = np.linspace(0.0, 5.0, 100)
+nn_outputs = []
+
+with torch.no_grad():
+    for y_val in y_grid:
+        y_tensor = torch.tensor([[y_val]], dtype=torch.float32)
+        output = nn_model(y_tensor).item()
+        nn_outputs.append(output)
+
+plt.figure(figsize=(10, 6))
+plt.plot(y_grid, nn_outputs, label='Neural Network function', linewidth=3)
+plt.xlabel('Y input')
+plt.ylabel('NN output')
+plt.title('Neural Network Function Shape')
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.show()
+
+# %% [markdown]
+# If we want to simulate the model with new parameters (e.g., different decay constant or
+# new neural network weights), we can simply create a new configuration and solve again.
+
+# %%
+# Simulate with a different decay parameter
+d_new = 0.3
+
+sol_ude_new = solve_ivp(
+    lambda t, y: xy_model_ude(t, y, nn_model, d_new),
+    [t_start, t_end],
+    u0,
+    dense_output=True,
+    method='RK45'
+)
+
+# Plot the new solution
+y_plot_new = sol_ude_new.sol(t_plot)
+
+plt.figure(figsize=(10, 6))
+plt.plot(t_plot, y_plot_new[0], label='X(t)', linewidth=2)
+plt.plot(t_plot, y_plot_new[1], label='Y(t)', linewidth=2)
+plt.xlabel('Time')
+plt.ylabel('Concentration')
+plt.title(f'UDE Simulation with d={d_new}')
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.show()
+
+# %% [markdown]
+# Note: In a real UDE application, you would typically train the neural network weights
+# to fit observed data using gradient descent and automatic differentiation. This would
+# involve defining a loss function and using an optimizer like Adam to minimize it.
+
+
+# %%
